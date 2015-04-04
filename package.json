@@ -1,0 +1,25 @@
+{
+  "name": "domino",
+  "version": "1.0.0",
+  "description": "Monadic Virtual Dom Rendering Engine",
+  "main": "lib/domino.js",
+  "scripts": {
+    "test": "cake test"
+  },
+  "keywords": [
+    "virtual",
+    "dom",
+    "js",
+    "html",
+    "framework"
+  ],
+  "author": "David Tai",
+  "license": "ISC",
+  "dependencies": {
+    "cake": "^0.1.1",
+    "chai": "^2.2.0",
+    "coffee-script": "^1.9.1",
+    "mocha": "^2.2.1",
+    "requisite": "^1.9.1"
+  }
+}
