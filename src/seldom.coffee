@@ -42,8 +42,10 @@ class FlowController
   # Event handler will be added to root element
   #
   # Example
-  # events:
-  #   'css.selector': 'flowName(see below)'
+  # events: {
+  #   'css.selector': 'flowName(see below)',
+  # }
+  #
   events: null
 
   # Define flows to be used with eventing
@@ -62,14 +64,15 @@ class FlowController
   #
   # Example
   # flows:
-  #   flowName:
-  #     sanitize {sanitizationRules:''}
-  #     validate {validationRules:''}
-  #     render renderFunction, 'template'
+  #   flowName: {
+  #     sanitize,
+  #     validate,
+  #     render,
+  #   }
   #
   flows: null
 
-  constructor: ()->
+  constructor: ->
     Object.defineProperty(@, 'data', {
       get: ()->
         return @_data
@@ -79,8 +82,8 @@ class FlowController
     })
     @init.apply @, arguments
 
-  init: ()->
+  init: ->
 
-  bind: ()->
+  bind: ->
 
   flow: (flowName) ->
