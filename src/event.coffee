@@ -16,7 +16,7 @@
 
 events = {}
 
-class EventEmitter
+module.exports = class EventEmitter
   # add a namespaced listener
   on: (name, listener, namespace = '') ->
     # add listener to event map, create missing hashes for namespace and event name
@@ -26,16 +26,16 @@ class EventEmitter
     if !(namedEvents = namespacedEvents[name])?
       namedEvents = namespacedEvents[name] = []
 
-    namedEvents.push(listener)
+    namedEvents.push listener
 
   # add a namespaced listener that only executes once
   once: (name, listener, namespace) ->
     # modify the listener function to off itself
     l2 = () =>
       listener.apply @, arguments
-      @off.apply @, name, l2, namespace
+      @off.call @, name, l2, namespace
 
-    @on(name, l2, namespace)
+    @on name, l2, namespace
 
   trigger: (name, data, namespace = '') ->
     # execute event in namespace, abort if namespae or event name does not exist
@@ -47,8 +47,8 @@ class EventEmitter
     if !namedEvents?
       return
 
-    for i, listener in namedEvents
-      listener.apply(@, data)
+    for listener in namedEvents
+      listener.call(@, data)
 
   # removed a namespaced listener
   off: (name, listener, namespace = '') ->
@@ -62,20 +62,26 @@ class EventEmitter
       return
 
     # return the listener removed if true, otherwise return null
-    for i, v in namedEvents
+    for i, v of namedEvents
       if listener == v
+        namedEvents.splice i, 1
         return v
 
     return null
 
   # various other ways of removing listeners
+  offAll: () ->
+    #delete everything
+    for k, v of events
+      delete events[k]
+
   offNamespace: (namespace) ->
     # delete a whole namespace
     delete events[namespace]
 
   offEvents: (name) ->
     # loop over namespaces and delete everything associated with event
-    for i, namespacedEvents of events
+    for namespacedEvents of events
       delete namespacedEvents[name]
 
   offNamespacedEvents: (name, namespace = '') ->
@@ -84,4 +90,10 @@ class EventEmitter
       namespacedEvents = events[namespace] = {}
 
     delete namespacedEvents[name]
+
+  # diagnostic
+  isEmpty: ()->
+    for k, v of events
+      return false
+    return true
 
