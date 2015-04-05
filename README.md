@@ -1,6 +1,6 @@
-##Domino##
+#Domino#
 
-#License#
+##License##
 Domino
 Copyright (c) 2015 David Tai
 
