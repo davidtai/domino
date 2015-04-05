@@ -1,7 +1,7 @@
-#Domino#
+#Seldom#
 
 ##License##
-Domino
+Seldom
 Copyright (c) 2015 David Tai
 
 Permission to use, copy, modify, and/or distribute this software for any

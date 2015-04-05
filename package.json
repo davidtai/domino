@@ -1,8 +1,8 @@
 {
-  "name": "domino",
+  "name": "seldom",
   "version": "1.0.0",
   "description": "Monadic Virtual Dom Rendering Engine",
-  "main": "lib/domino.js",
+  "main": "lib/seldom.js",
   "scripts": {
     "test": "cake test"
   },
@@ -15,7 +15,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/davidtai/domino"
+    "url": "https://github.com/davidtai/seldom"
   },
   "author": "David Tai",
   "license": "ISC",
