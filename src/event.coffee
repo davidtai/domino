@@ -14,14 +14,17 @@
 # CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #
 
-events = {}
 
 module.exports = class EventEmitter
+  events: null
+  constructor: ->
+    @events = {}
+
   # add a namespaced listener
   on: (name, listener, namespace = '') ->
     # add listener to event map, create missing hashes for namespace and event name
-    if !(namespacedEvents = events[namespace])?
-      namespacedEvents = events[namespace] = {}
+    if !(namespacedEvents = @events[namespace])?
+      namespacedEvents = @events[namespace] = {}
 
     if !(namedEvents = namespacedEvents[name])?
       namedEvents = namespacedEvents[name] = []
@@ -39,7 +42,7 @@ module.exports = class EventEmitter
 
   trigger: (name, data, namespace = '') ->
     # execute event in namespace, abort if namespae or event name does not exist
-    namespacedEvents = events[namespace]
+    namespacedEvents = @events[namespace]
     if !namespacedEvents?
       return
 
@@ -53,7 +56,7 @@ module.exports = class EventEmitter
   # removed a namespaced listener
   off: (name, listener, namespace = '') ->
     # abort off if namespace or event name does not exist
-    namespacedEvents = events[namespace]
+    namespacedEvents = @events[namespace]
     if !namespacedEvents?
       return
 
@@ -72,28 +75,28 @@ module.exports = class EventEmitter
   # various other ways of removing listeners
   offAll: () ->
     #delete everything
-    for k, v of events
-      delete events[k]
+    for k, v of @events
+      delete @events[k]
 
   offNamespace: (namespace) ->
     # delete a whole namespace
-    delete events[namespace]
+    delete @events[namespace]
 
   offEvents: (name) ->
     # loop over namespaces and delete everything associated with event
-    for namespacedEvents of events
+    for namespacedEvents of @events
       delete namespacedEvents[name]
 
   offNamespacedEvents: (name, namespace = '') ->
     # delete everything associated with event in a specific namespace
-    if !(namespacedEvents = events[namespace])?
-      namespacedEvents = events[namespace] = {}
+    if !(namespacedEvents = @events[namespace])?
+      namespacedEvents = @events[namespace] = {}
 
     delete namespacedEvents[name]
 
   # diagnostic
   isEmpty: ()->
-    for k, v of events
+    for k, v of @events
       return false
     return true
 
