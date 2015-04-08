@@ -45,6 +45,26 @@ class FlowState
 
   constructor: (@data, @dom, @event)->
 
+rootFlowControllers = []
+
+module.exports.MainLoop =
+  start: ()->
+    render = ()->
+      # Create temporary variable to hold FlowControllers to render
+      flowControllers = []
+      for rootFlowController in rootFlowControllers
+        flowControllers.push rootFlowController
+
+      # Start looping through all FlowControllers,
+      for flowController in flowControllers
+        flowController.trigger 'render'
+        # Add children to FlowControllers needing Rendering
+        for childFlowController in flowController.children
+          flowControllers.push childFlowController
+
+      requestAnimationFrame render
+    requestAnimationFrame render
+
 # A FlowController maps events to 'flows' which are basically a list monadic binds
 # to be executed by the FlowController monad
 module.exports.FlowController = class FlowController extends EventEmitter
@@ -108,6 +128,8 @@ module.exports.FlowController = class FlowController extends EventEmitter
 
   constructor: (@selector, data_, @isRoot)->
     super()
+    if @isRoot
+      rootFlowControllers.push @
     @_data = data_
 
     Object.defineProperty @, 'data',
@@ -131,7 +153,8 @@ module.exports.FlowController = class FlowController extends EventEmitter
       if !@_dom?
         @_h = hs
         @_dom = createElement hs
-        $(@selector).append @_dom
+        if @isRoot
+          $(@selector).append @_dom
       else
         patches = diff hs, @_h
         @_h = hs
@@ -140,7 +163,9 @@ module.exports.FlowController = class FlowController extends EventEmitter
       # Rerender children and reattach them
       for child in @children
         child.trigger 'render'
-        @_dom.find $(@_dom).find(child.selector+':first').append(child._dom)
+        $(@_dom).find(child.selector+':first').append child._dom
+
+      return data
 
   bindEvents: ->
     for eventSpecStr, flow of @flows

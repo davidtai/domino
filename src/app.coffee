@@ -1,3 +1,4 @@
+MainLoop = require('../lib/seldom').MainLoop
 FlowController = require('../lib/seldom').FlowController
 h = require 'virtual-dom/h'
 
@@ -13,4 +14,5 @@ $ ()->
       @setFlow 'render', @render(HelloWorldTemplate)
 
   hwc = new HelloWorldController()
-  hwc.trigger 'render'
+
+MainLoop.start()

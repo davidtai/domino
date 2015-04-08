@@ -4,7 +4,6 @@ module.exports =
       newData = state.event.data
     else
       newData = data
-    @trigger('render', newData)
     return newData
 
   higherOrder:
