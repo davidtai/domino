@@ -22,8 +22,6 @@ diff            = require 'virtual-dom/diff'
 patch           = require 'virtual-dom/patch'
 createElement   = require 'virtual-dom/create-element'
 
-html2hscript    = require 'html2hscript'
-
 EventEmitter    = require './event'
 premade         = require './premade'
 
@@ -52,6 +50,9 @@ class FlowState
 module.exports.FlowController = class FlowController extends EventEmitter
   # jquery/css selector for finding an element in a parent
   selector: ''
+
+  # is a root FlowController
+  isRoot: false
 
   # HScript root
   _h: null
@@ -105,7 +106,10 @@ module.exports.FlowController = class FlowController extends EventEmitter
   # Used internally to store compiled flow functions
   _flows: null
 
-  constructor: ->
+  constructor: (@selector, data_, @isRoot)->
+    super()
+    @_data = data_
+
     Object.defineProperty @, 'data',
       get: ()->
         return @_data
@@ -113,20 +117,21 @@ module.exports.FlowController = class FlowController extends EventEmitter
         return @trigger 'set', data
 
     @_flows = {}
+    @children = []
 
     @init.apply @, arguments
     @bindEvents()
 
   init: ->
 
-  render: (renderFunc, template)->
+  render: (templateFn)->
     return (data, state) ->
       # Generate the dom elements
-      html = renderFunc template, data
-      hs = html2hscript html
+      hs = templateFn data
       if !@_dom?
         @_h = hs
         @_dom = createElement hs
+        $(@selector).append @_dom
       else
         patches = diff hs, @_h
         @_h = hs
@@ -138,7 +143,7 @@ module.exports.FlowController = class FlowController extends EventEmitter
         @_dom.find $(@_dom).find(child.selector+':first').append(child._dom)
 
   bindEvents: ->
-    for eventSpecStr, flow in @flows
+    for eventSpecStr, flow of @flows
       try
         eventSpec = parseEventSpec eventSpecStr
       catch error
@@ -149,41 +154,47 @@ module.exports.FlowController = class FlowController extends EventEmitter
       namespace = eventSpec.namespace
       selector  = eventSpec.selector
 
-      if eventSpec.selector?
-        if !(flowFn = @_flow[eventSpecStr])?
-          do (event, namespace, selector, flow) ->
-            flowFn = @_flow[eventSpecStr] = (e) =>
+      do (eventSpecStr, event, namespace, selector, flow) =>
+        if eventSpec.selector?
+          if !(flowFn = @_flows[eventSpecStr])?
+            flowFn = @_flows[eventSpecStr] = (e) =>
               staleData = @data
               data = _.extend {}, staleData
-              state = new State staleData, @_dom, event
+              state = new FlowState staleData, @_dom, event
+              if !_.isArray flow
+                flow = [flow]
               for fn in flow
                 try
-                  data = fn data, state
+                  data = fn.call @, data, state
                 catch error
                   console.log error.message + ' while executing ' + eventSpecStr
                   continue
-              @data = data
+              @_data = data
 
-        @on event, flowFn, namespace
-      else
-        if !(flowFn = @_flow[eventSpecStr])?
-          do (event, namespace, flow) ->
-            flowFn = @_flow[eventSpecStr] = (data_) =>
+          @on eventSpecStr, flowFn, namespace
+        else
+          if !(flowFn = @_flows[eventSpecStr])?
+            flowFn = @_flows[eventSpecStr] = (data_) =>
               staleData = @data
               data = data_ || _.extend {}, staleData
-              state = new State staleData, @_dom, event
+              state = new FlowState staleData, @_dom, event
+              if !_.isArray flow
+                flow = [flow]
               for fn in flow
                 try
-                  data = fn data, state
+                  data = fn.call @, data, state
                 catch error
                   console.log error.message + ' while executing ' + eventSpecStr
                   continue
-              @data = data
+              @_data = data
 
-        @on event, flowFn, namespace
+          @on event, flowFn, namespace
 
   unbindEvents: ->
     @offAll()
+
+  setFlow: (name, flow)->
+    @flows[name] = flow
 
 # Helpers
 class EventSpec
@@ -191,7 +202,7 @@ class EventSpec
   namespace: null
   selector: null
 
-  cosntructor: (@event, @namespace, @selector)->
+  constructor: (@event, @namespace, @selector)->
 
 parseEventSpec = (str)->
   tokens = str.split ' ', 1
