@@ -1,10 +1,13 @@
 module.exports =
-  set: (data)->
+  set: (data, state)->
     if state.event.name == 'set'
       newData = state.event.data
     else
       newData = data
     return newData
+
+  static: (data, state)->
+    return state.stale
 
   higherOrder:
     # console.logs something

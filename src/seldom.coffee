@@ -36,31 +36,34 @@ class FlowEvent
 
 # A FlowState is a dictionary of meta data with some special fields (listed below)
 class FlowState
-  # data is data value before a flow is executed
-  data: null
+  # stale is stale data value before a flow is executed
+  stale: null
   # dom is the root dom object
   dom: null
   # event is a FlowEvent object if flow is triggered by an event
   event: null
 
-  constructor: (@data, @dom, @event)->
+  constructor: (@stale, @dom, @event)->
 
-rootFlowControllers = []
+scheduledToRenderFlowControllers = []
 
 module.exports.MainLoop =
   start: ()->
     render = ()->
       # Create temporary variable to hold FlowControllers to render
       flowControllers = []
-      for rootFlowController in rootFlowControllers
-        flowControllers.push rootFlowController
+      for scheduledToRenderFlowController in scheduledToRenderFlowControllers
+        flowControllers.push scheduledToRenderFlowController
 
       # Start looping through all FlowControllers,
       for flowController in flowControllers
-        flowController.trigger 'render'
-        # Add children to FlowControllers needing Rendering
-        for childFlowController in flowController.children
-          flowControllers.push childFlowController
+        if flowController._needsRender
+          flowController.trigger 'render'
+        # # Add children to FlowControllers needing Rendering
+        # for childFlowController in flowController.children
+        #   flowControllers.push childFlowController
+
+      scheduledToRenderFlowControllers.length = 0
 
       requestAnimationFrame render
     requestAnimationFrame render
@@ -72,7 +75,10 @@ module.exports.FlowController = class FlowController extends EventEmitter
   selector: ''
 
   # is a root FlowController
-  isRoot: false
+  root: false
+
+  # original options passed in
+  options: null
 
   # HScript root
   _h: null
@@ -86,8 +92,12 @@ module.exports.FlowController = class FlowController extends EventEmitter
   # child flow controllers
   children: null
 
-  # Internally stored dom event map to be used in unbinding dom events
+  # Array of dom events to bind, generated from flows
+  # Also could be used in unbinding dom events
   _domEvents: null
+
+  # internally used by scheduling render
+  _needsRender: false
 
   # Define an event to flow mapping using Backbone style eventing syntax
   # Events can either be composed of a event name or an event name with a css selector.
@@ -117,8 +127,7 @@ module.exports.FlowController = class FlowController extends EventEmitter
   #   ]
   #
   flows:
-    set: (data, state) ->
-      premade.set
+    set: premade.set
     render: [
       premade.higherOrder.log("No 'render' flow defined")
     ]
@@ -126,46 +135,63 @@ module.exports.FlowController = class FlowController extends EventEmitter
   # Used internally to store compiled flow functions
   _flows: null
 
-  constructor: (@selector, data_, @isRoot)->
+  constructor: (options = {})->
+    @options    = options
+    @selector   = options.selector || @selector
+    data_       = options.data || {}
+    @root       = options.root || @root
+    @children   = options.children || []
+
     super()
-    if @isRoot
-      rootFlowControllers.push @
-    @_data = data_
 
     Object.defineProperty @, 'data',
       get: ()->
         return @_data
       set: (data)->
-        return @trigger 'set', data
+        if data != @_data
+          @trigger 'set', data
+          @scheduleRender()
+        return @_data
 
+    @flows = _.extend {}, @flows
     @_flows = {}
-    @children = []
+    @_domEvents = {}
 
     @init.apply @, arguments
     @bindEvents()
 
+    @data = data_
+
   init: ->
 
-  render: (templateFn)->
+  render: (templateFn, triggerSet)->
     return (data, state) ->
       # Generate the dom elements
       hs = templateFn data
       if !@_dom?
         @_h = hs
         @_dom = createElement hs
-        if @isRoot
+        if @root
           $(@selector).append @_dom
+
+        for eventSpecStr, event of @_domEvents
+          $(@_dom).on event.event, event.selector, event.handler
       else
-        patches = diff hs, @_h
-        @_h = hs
+        patches = diff @_h, hs
         @_dom = patch @_dom, patches
+        @_h = hs
+
+      @_needsRender = false
 
       # Rerender children and reattach them
       for child in @children
         child.trigger 'render'
         $(@_dom).find(child.selector+':first').append child._dom
 
-      return data
+      if triggerSet
+        return data
+      else
+        return state.stale
 
   bindEvents: ->
     for eventSpecStr, flow of @flows
@@ -185,7 +211,7 @@ module.exports.FlowController = class FlowController extends EventEmitter
             flowFn = @_flows[eventSpecStr] = (e) =>
               staleData = @data
               data = _.extend {}, staleData
-              state = new FlowState staleData, @_dom, event
+              state = new FlowState staleData, @_dom, e
               if !_.isArray flow
                 flow = [flow]
               for fn in flow
@@ -194,9 +220,17 @@ module.exports.FlowController = class FlowController extends EventEmitter
                 catch error
                   console.log error.message + ' while executing ' + eventSpecStr
                   continue
-              @_data = data
+              @data = data
 
           @on eventSpecStr, flowFn, namespace
+
+          # dom event
+          @_domEvents[eventSpecStr] =
+            event:      event
+            selector:   selector
+            handler: (event)=>
+              @trigger eventSpecStr, event
+              event.stopPropagation()
         else
           if !(flowFn = @_flows[eventSpecStr])?
             flowFn = @_flows[eventSpecStr] = (data_) =>
@@ -211,15 +245,26 @@ module.exports.FlowController = class FlowController extends EventEmitter
                 catch error
                   console.log error.message + ' while executing ' + eventSpecStr
                   continue
-              @_data = data
+
+              # set is special event that need to bypass itself to prevent infinite loop
+              if event == 'set'
+                @_data = data
+              else
+                @data = data
 
           @on event, flowFn, namespace
 
   unbindEvents: ->
     @offAll()
+    $(@_dom).off()
 
-  setFlow: (name, flow)->
-    @flows[name] = flow
+  delete: ->
+    @unbindEvents()
+    $(@_dom).remove()
+
+  scheduleRender: ()->
+    @_needsRender = true
+    scheduledToRenderFlowControllers.unshift @
 
 # Helpers
 class EventSpec
@@ -230,22 +275,28 @@ class EventSpec
   constructor: (@event, @namespace, @selector)->
 
 parseEventSpec = (str)->
-  tokens = str.split ' ', 1
+  tokens = str.split ' '
+  if tokens.length > 1
+    token0 = tokens.shift()
+    tokens = [token0, tokens.join(' ')]
 
   switch tokens.length
     # Triggerable Event Case (event, no css selector)
     when 1
       eventToken = tokens[0]
-      eventTokens = eventToken.split '.', 1
+      # extract namespace
+      eventTokens = eventToken.split ':', 1
       switch eventTokens.length
         when 1
           return new EventSpec eventTokens[0]
         when 2
           return new EventSpec eventTokens[0], eventTokens[1]
+    # Dom Event Case (event, css selector)
     when 2
-    # Dom Event Case (event, no css selector)
       eventToken = tokens[0]
+      #extract namespace
       selector = tokens[1]
+      eventTokens = eventToken.split ':', 1
       switch eventTokens.length
         when 1
           return new EventSpec eventTokens[0], '', selector
