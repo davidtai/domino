@@ -6,7 +6,7 @@ h = require 'virtual-dom/h'
 
 $ ()->
   ListTemplate = (data) ->
-    h 'div.text#fancy-list',[
+    children = [
       'Alphabetized List'
       h 'ul'
       h 'input', placeholder: 'Type Something Here'
@@ -14,6 +14,11 @@ $ ()->
         'Add +'
       ]
     ]
+
+    if data.error
+      children.push h 'div', class: 'error', data.error
+
+    h 'div.text#fancy-list', children
 
   ListItemTemplate = (data)->
     h 'li', [
@@ -35,6 +40,12 @@ $ ()->
         return data
       @flows.render = @render(ListTemplate)
       @flows.set = [
+        premade.higherOrder.validate (data)->
+          for message in data.messages
+            if message == ''
+              return "List Item cannot be empty"
+          return null
+
         premade.set
         (data) ->
           data.messages = data.messages.sort()

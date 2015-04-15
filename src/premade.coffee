@@ -1,3 +1,5 @@
+_ = require 'underscore'
+
 module.exports =
   set: (data, state)->
     if state.event.name == 'set'
@@ -10,6 +12,23 @@ module.exports =
     return state.stale
 
   higherOrder:
+    validate: (validateFn, errorField)->
+      return (data, state)->
+        err = validateFn data
+        if !err
+          if errorField
+            data[errorField] = ''
+          else
+            data.error = ''
+          return data
+        else
+          original = _.extend {}, state.stale
+          if errorField
+            original[errorField] = err
+          else
+            original.error = err
+          return original
+
     # console.logs something
     log: (message) ->
       return (data)->
