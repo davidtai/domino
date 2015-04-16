@@ -83,8 +83,11 @@ module.exports.FlowController = class FlowController extends EventEmitter
   # original options passed in
   options: null
 
-  # HScript root
+  # currently rendered HScript root
   _h: null
+
+  # most recently rendered HScript root
+  _lastH: null
 
   # Last rendered dom element
   _dom: null
@@ -131,9 +134,6 @@ module.exports.FlowController = class FlowController extends EventEmitter
   #
   flows:
     set: premade.set
-    render: [
-      premade.higherOrder.log("No 'render' flow defined")
-    ]
 
   # Used internally to store compiled flow functions
   _flows: null
@@ -147,6 +147,8 @@ module.exports.FlowController = class FlowController extends EventEmitter
 
     super()
 
+    @_data = {}
+
     Object.defineProperty @, 'data',
       get: ()->
         return @_data
@@ -157,6 +159,8 @@ module.exports.FlowController = class FlowController extends EventEmitter
         return @_data
 
     @flows = _.extend {}, @flows
+    @flows.render = @render
+
     @_flows = {}
     @_domEvents = {}
 
@@ -167,34 +171,35 @@ module.exports.FlowController = class FlowController extends EventEmitter
 
   init: ->
 
-  render: (templateFn, triggerSet)->
-    return (data, state) ->
+  render: (data, state)->
+    if !@_dom?
+      @_dom = createElement @_lastH
+      if @root
+        $(@selector).append @_dom
+
+      for eventSpecStr, event of @_domEvents
+        $(@_dom).on event.event, event.selector, event.handler
+
+      @_h = @_lastH
+    else
+      patches = diff @_h, @_lastH
+      @_dom = patch @_dom, patches
+      @_h = @_lastH
+
+    @_needsRender = false
+
+    # Rerender children and reattach them
+    for child in @children
+      child.trigger 'render'
+      $(@_dom).find(child.selector+':first').append child._dom
+
+    return state.stale
+
+  update: (templateFn)->
+    return (data) ->
       # Generate the dom elements
-      hs = templateFn data
-      if !@_dom?
-        @_h = hs
-        @_dom = createElement hs
-        if @root
-          $(@selector).append @_dom
-
-        for eventSpecStr, event of @_domEvents
-          $(@_dom).on event.event, event.selector, event.handler
-      else
-        patches = diff @_h, hs
-        @_dom = patch @_dom, patches
-        @_h = hs
-
-      @_needsRender = false
-
-      # Rerender children and reattach them
-      for child in @children
-        child.trigger 'render'
-        $(@_dom).find(child.selector+':first').append child._dom
-
-      if triggerSet
-        return data
-      else
-        return state.stale
+      @_lastH = templateFn data
+      return data
 
   bindEvents: ->
     for eventSpecStr, flow of @flows

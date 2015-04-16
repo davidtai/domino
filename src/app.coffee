@@ -28,7 +28,7 @@ $ ()->
   class ListItemFlowController extends FlowController
     selector: 'ul'
     init: ->
-      @flows.render = @render(ListItemTemplate)
+      @flows.set.push @update(ListItemTemplate)
 
   class SortedListFlowController extends FlowController
     selector: 'body'
@@ -38,14 +38,13 @@ $ ()->
         target = state.event.target
         data.messages.push $(@_dom).find('input').val()
         return data
-      @flows.render = @render(ListTemplate)
+
       @flows.set = [
         premade.higherOrder.validate (data)->
           for message in data.messages
             if message == ''
               return "List Item cannot be empty"
           return null
-
         premade.set
         (data) ->
           data.messages = data.messages.sort()
@@ -61,6 +60,7 @@ $ ()->
                 message: data.messages[i]
             i++
           return data
+        @update(ListTemplate)
       ]
 
   new SortedListFlowController
